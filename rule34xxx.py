@@ -14,11 +14,10 @@ from pathlib import Path
 
 from reliq import RQ
 
-reliq = RQ(cached=True)
-
 # from curl_cffi import requests
 import requests
-from urllib.parse import urljoin
+
+reliq = RQ(cached=True)
 
 
 class RequestLError(Exception):
@@ -241,7 +240,7 @@ class rule34xxx:
                     .comments div #comment-list; div #b>c child@; {
                         div .col1; {
                             [0] a child@; {
-                                .user_link * self@ | "%(href)Dv" trim,
+                                .user_link.U * self@ | "%(href)Dv" trim,
                                 .user * self@ | "%Di" trim
                             },
                             .id.u span child@ | "%i",
@@ -258,18 +257,15 @@ class rule34xxx:
             ret += r["comments"]
 
             nexturl = rq.search(
-                r"""
-                div #paginator; a alt=next | "%(onclick)v" sed "s/.*location='//; s/'.*//" decode trim
-            """
+                r""" div #paginator; a alt=next | "%(onclick)v" sed "s/.*location='//; s/'.*//" decode trim """
             )
             if len(nexturl) == 0:
                 break
-            nexturl = urljoin(ref, nexturl)
+            nexturl = rq.ujoin(nexturl)
             rq, ref = self.ses.get_html(nexturl)
 
         for i in ret:
             i["date"] = self.conv_date(i["date"])
-            i["user_link"] = urljoin(ref, i["user_link"])
 
         return ret
 
@@ -282,19 +278,19 @@ class rule34xxx:
         r = json.loads(
             rq.search(
                 r"""
-                .image img #image src | "%(src)Dv" trim,
-                .original div .link-list; a i@"Original image" | "%(href)Dv" trim,
+                .image.U img #image src | "%(src)Dv" trim,
+                .original.U div .link-list; a i@"Original image" | "%(href)Dv" trim,
                 div #stats; {
                     .id.u li i@b>"Id: " | "%i" sed "s/^.*: //",
                     li i@"Posted: "; {
                         .date * self@  | "%i" sed "s/^[A-Za-z0-9]*: //; s/<.*//;q" trim,
                         * self@; [0] a; {
-                            .uploader_link * self@ | "%(href)Dv" trim,
+                            .uploader_link.U * self@ | "%(href)Dv" trim,
                             .uploader * self@  | "%Di" sed "/ /!p" "n" trim
                         }
                     },
                     .rating li i@"Rating: " | "%Di" / sed 's/.*: //' trim,
-                    .sources.a li i@"Source:"; a | "%(href)v\n",
+                    .sources.a.U li i@"Source:"; a | "%(href)v\n",
                    .sizex.u li i@b>"Size: " | "%i" sed "s/^.*: //; s/x.*//",
                    .sizey.u li i@b>"Size: " | "%i" sed "s/^.*: //; s/.*x//",
                    .score.u span #B>"psc[0-9]*" | "%i"
@@ -313,13 +309,7 @@ class rule34xxx:
         r["url"] = url
         r["comments"] = self.get_comments(rq, ref)
 
-        r["image"] = urljoin(ref, r["image"])
-        r["original"] = urljoin(ref, r["original"])
-        r["uploader_link"] = urljoin(ref, r["uploader_link"])
-        r["uploader"] = urljoin(ref, r["uploader"])
         r["date"] = self.conv_date(r["date"])
-        for i, j in enumerate(r["sources"]):
-            r["sources"][i] = urljoin(ref, j)
 
         return r
 
@@ -331,12 +321,9 @@ class rule34xxx:
         return int(rq.search(r'span .thumb; [0] a href | "%(href)v\n" sed "s/.*=//"'))
 
     def get_page_posts(self, rq, ref):
-        r = json.loads(rq.search(r'.urls.a div .image-list; a id | "%(href)v\n"'))[
+        return json.loads(rq.search(r'.urls.a.U div .image-list; a id | "%(href)v\n"'))[
             "urls"
         ]
-        for i, j in enumerate(r):
-            r[i] = urljoin(ref, j)
-        return r
 
     @staticmethod
     def post_url_to_id(url):
@@ -350,12 +337,11 @@ class rule34xxx:
 
         nexturl = rq.search(r'div #paginator; [0] a alt=next | "%(href)Dv" trim')
         if len(nexturl) != 0:
-            nexturl = urljoin(ref, nexturl)
+            nexturl = rq.ujoin(nexturl)
 
-        lastpage = rq.search(
-            r'div #paginator; [0] a alt="last page" | "%(href)v" / sed "s/.*(\?|&|&amp;)pid=//;s/( |\?|&|&amp;).*//" "E"'
-        )
-        lastpage = 0 if len(lastpage) == 0 else int(lastpage)
+        lastpage = rq.json(
+            r'.u.u div #paginator; [0] a alt="last page" | "%(href)v" / sed "s/.*(\?|&|&amp;)pid=//;s/( |\?|&|&amp;).*//" "E"'
+        )["u"]
 
         return {
             "url": url,
@@ -432,7 +418,10 @@ def _nans():
 
 def post_get(p_id):
     fname = work_path / str(p_id)
-    if os.path.exists(str(fname) + "_e"):
+
+    nonexisiting_path = str(fname) + "_e"
+
+    if os.path.exists(nonexisiting_path):
         return
     if fname.exists() and os.path.getsize(fname) > 10:
         return
@@ -440,7 +429,7 @@ def post_get(p_id):
     try:
         r = rl34.get_post(url="", p_id=p_id)
     except RequestLError:
-        with open(str(fname) + "_e", "w") as f:
+        with open(nonexisiting_path, "w") as f:
             f.write("\n")
         return
     except (RequestError, RequestCError, RequestBadError):
