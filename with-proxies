@@ -1,0 +1,33 @@
+#!/bin/bash
+
+IFS=$'\n'
+
+[ "$#" -lt 2 ] && {
+    echo "$0 <DIR> <PROXIES FILE>"  >&2
+    exit
+}
+
+dir="$1"
+proxies="$(< "$2")"
+lastid="$(./rule34xxx.py --last-id)"
+
+jobs="$(wc -l <<< "$proxies")"
+((jobs++))
+
+step=$((lastid/jobs))
+first=1
+last=$step
+
+echo "$lastid/$jobs"
+
+for i in $proxies ""
+do
+    [ -z "$i" ] && last="$lastid"
+
+    echo "$i $first $last"
+
+    ((first+=step))
+    ((last+=step))
+    [ -z "$i" ] && break
+done | parallel -j "$jobs" -C ' ' \
+    ./rule34xxx.py -w 0.4 -W 200 --first {2} --last {3} -d "$dir" --proxies "'{\"https\": \"{1}\"}'"
