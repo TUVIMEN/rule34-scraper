@@ -12,7 +12,9 @@ from typing import Optional, Tuple, Generator, Callable
 from datetime import datetime
 from pathlib import Path
 
-from reliq import reliq
+from reliq import RQ
+
+reliq = RQ(cached=True)
 
 # from curl_cffi import requests
 import requests
@@ -109,16 +111,6 @@ class Session:
 
         return ret
 
-    @staticmethod
-    def base(rq: reliq, url: str) -> str:
-        ref = url
-        u = rq.search(r'[0] head; [0] base href=>[1:] | "%(href)v"')
-        if u != "":
-            u = urljoin(url, u)
-            if u != "":
-                ref = u
-        return ref
-
     def r_req_try(self, url: str, method: str, retry: bool = False, **kwargs):
         if not retry:
             if self.wait != 0:
@@ -190,8 +182,8 @@ class Session:
     ) -> Tuple[reliq, str] | Tuple[reliq, str, dict]:
         resp = self.r_req(url, **kwargs)
 
-        rq = reliq(resp.text)
-        ref = self.base(rq, url)
+        rq = reliq(resp.text, ref=url)
+        ref = rq.ref
 
         if return_cookies:
             return (rq, ref, resp.cookies.get_dict())
