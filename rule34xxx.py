@@ -12,202 +12,20 @@ from typing import Optional, Tuple, Generator, Callable
 from datetime import datetime
 from pathlib import Path
 
-from reliq import RQ
-
 # from curl_cffi import requests
 import requests
+from reliq import RQ
+import treerequests
 
 reliq = RQ(cached=True)
 
 
-class RequestLError(Exception):
-    pass
-
-
-class RequestCError(Exception):
-    pass
-
-
-class RequestBadError(Exception):
-    pass
-
-
-class RequestError(Exception):
-    pass
-
-
-def bool_get(obj: dict, name: str, otherwise: bool = False) -> bool:
-    x = obj.get(name)
-    if x is None:
-        return otherwise
-    return bool(x)
-
-
-def int_get(obj: dict, name: str, otherwise: int = 0) -> int:
-    x = obj.get(name)
-    if x is None:
-        return otherwise
-    return int(x)
-
-
-def float_get(obj: dict, name: str, otherwise: float = 0) -> float:
-    x = obj.get(name)
-    if x is None:
-        return otherwise
-    return float(x)
-
-
-def dict_get(obj: dict, name: str) -> dict:
-    x = obj.get(name)
-    if not isinstance(x, dict):
-        return {}
-    return x
-
-
-class Session:
-    def __init__(self, **kwargs):
-        super().__init__()
-
-        self.proxies = {}
-        self.headers = {}
-        self.cookies = {}
-
-        self.proxies.update(dict_get(kwargs, "proxies"))
-        self.headers.update(dict_get(kwargs, "headers"))
-        self.cookies.update(dict_get(kwargs, "cookies"))
-
-        self.timeout = int_get(kwargs, "timeout", 30)
-        self.verify = bool_get(kwargs, "verify", True)
-        self.allow_redirects = bool_get(kwargs, "allow_redirects", False)
-
-        t = kwargs.get("user_agent")
-        self.user_agent = (
-            t
-            if t is not None
-            else "Mozilla/5.0 (X11; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0"
-        )
-
-        self.headers.update({"User-Agent": self.user_agent})
-
-        self.retries = int_get(kwargs, "retries", 3)
-        self.retry_wait = float_get(kwargs, "retry_wait", 60)
-        self.wait = float_get(kwargs, "wait")
-        self.wait_random = int_get(kwargs, "wait_random")
-
-        self.logger = kwargs.get("logger")
-
-        self.ses = self.session()
-
-    def session(self):
-        ret = requests.Session()
-
-        ret.proxies.update(self.proxies)
-        ret.headers.update(self.headers)
-        ret.cookies.update(self.cookies)
-
-        ret.verify = self.verify
-        ret.user_agent = self.user_agent
-
-        return ret
-
-    def r_req_try(self, url: str, method: str, retry: bool = False, **kwargs):
-        if not retry:
-            if self.wait != 0:
-                time.sleep(self.wait)
-            if self.wait_random != 0:
-                time.sleep(random.randint(0, self.wait_random + 1) / 1000)
-
-        if self.logger is not None:
-            print(url, file=self.logger)
-
-        nargs = {"allow_redirects": self.allow_redirects, "timeout": self.timeout}
-        nargs.update(kwargs)
-
-        if method == "get":
-            return self.ses.get(url, **nargs)
-        elif method == "post":
-            return self.ses.post(url, **nargs)
-        elif method == "delete":
-            return self.ses.delete(url, **nargs)
-        elif method == "put":
-            return self.ses.put(url, **nargs)
-
-    def r_req(self, url: str, method: str = "get", **kwargs):
-        tries = self.retries
-        retry_wait = self.retry_wait
-
-        instant_end_code = [404]
-
-        i = 0
-        while True:
-            try:
-                resp = self.r_req_try(url, method, retry=(i != 0), **kwargs)
-                self.ses = self.session()
-            except (
-                requests.ConnectTimeout,
-                requests.ConnectionError,
-                requests.ReadTimeout,
-                requests.exceptions.ChunkedEncodingError,
-                RequestError,
-            ):
-                resp = None
-
-            if resp is None or not (
-                resp.status_code >= 200 and resp.status_code <= 299
-            ):
-                if resp is not None and resp.status_code in instant_end_code:
-                    raise RequestCError(
-                        "failed completely {} {}".format(resp.status_code, url)
-                    )
-                if resp is not None and resp.status_code == 302:
-                    raise RequestLError
-                if i >= tries:
-                    if resp is None:
-                        raise RequestError
-                    else:
-                        raise RequestBadError(
-                            "failed {} {}".format(
-                                "connection" if resp is None else resp.status_code, url
-                            )
-                        )
-                i += 1
-                if retry_wait != 0:
-                    time.sleep(retry_wait)
-            else:
-                return resp
-
-    def get_html(
-        self, url: str, return_cookies: bool = False, **kwargs
-    ) -> Tuple[reliq, str] | Tuple[reliq, str, dict]:
-        resp = self.r_req(url, **kwargs)
-
-        rq = reliq(resp.text, ref=url)
-        ref = rq.ref
-
-        if return_cookies:
-            return (rq, ref, resp.cookies.get_dict())
-        return (rq, ref)
-
-    def get_json(self, url: str, **kwargs) -> dict:
-        resp = self.r_req(url, **kwargs)
-        return resp.json()
-
-    def post_json(self, url: str, **kwargs) -> dict:
-        resp = self.r_req(url, method="post", **kwargs)
-        return resp.json()
-
-    def delete_json(self, url: str, **kwargs) -> dict:
-        resp = self.r_req(url, method="delete", **kwargs)
-        return resp.json()
-
-    def put_json(self, url: str, **kwargs) -> dict:
-        resp = self.r_req(url, method="put", **kwargs)
-        return resp.json()
-
-
 class rule34xxx:
     def __init__(self, **kwargs):
-        self.ses = Session(
+        self.ses = treerequests.Session(
+            requests,
+            requests.Session,
+            lambda x, y: treerequests.reliq(x, y, obj=reliq),
             **kwargs,
         )
 
@@ -231,7 +49,7 @@ class rule34xxx:
 
         return datetime.strptime(date, "%Y-%m-%d %H:%M:%S").isoformat()
 
-    def get_comments(self, rq, ref):
+    def get_comments(self, rq):
         ret = []
         while True:
             r = json.loads(
@@ -262,7 +80,7 @@ class rule34xxx:
             if len(nexturl) == 0:
                 break
             nexturl = rq.ujoin(nexturl)
-            rq, ref = self.ses.get_html(nexturl)
+            rq = self.ses.get_html(nexturl)
 
         for i in ret:
             i["date"] = self.conv_date(i["date"])
@@ -273,7 +91,7 @@ class rule34xxx:
         if p_id != 0:
             url = "https://rule34.xxx/index.php?page=post&s=view&id={}".format(p_id)
 
-        rq, ref = self.ses.get_html(url)
+        rq = self.ses.get_html(url)
 
         r = json.loads(
             rq.search(
@@ -307,20 +125,18 @@ class rule34xxx:
             )
         )
         r["url"] = url
-        r["comments"] = self.get_comments(rq, ref)
+        r["comments"] = self.get_comments(rq)
 
         r["date"] = self.conv_date(r["date"])
 
         return r
 
     def get_lastpost_id(self):
-        rq, ref = self.ses.get_html(
-            "https://rule34.xxx/index.php?page=post&s=list&tags=all"
-        )
+        rq = self.ses.get_html("https://rule34.xxx/index.php?page=post&s=list&tags=all")
 
         return int(rq.search(r'span .thumb; [0] a href | "%(href)v\n" sed "s/.*=//"'))
 
-    def get_page_posts(self, rq, ref):
+    def get_page_posts(self, rq):
         return json.loads(rq.search(r'.urls.a.U div .image-list; a id | "%(href)v\n"'))[
             "urls"
         ]
@@ -333,7 +149,7 @@ class rule34xxx:
         return int(r[1])
 
     def get_page(self, url: str, page: int = 1) -> dict:
-        rq, ref = self.ses.get_html(url)
+        rq = self.ses.get_html(url)
 
         nexturl = rq.search(r'div #paginator; [0] a alt=next | "%(href)Dv" trim')
         if len(nexturl) != 0:
@@ -348,7 +164,7 @@ class rule34xxx:
             "nexturl": nexturl,
             "page": page,
             "lastpage": lastpage,
-            "posts": self.get_page_posts(rq, ref),
+            "posts": self.get_page_posts(rq),
         }
 
     def get_pages(self):
@@ -368,7 +184,13 @@ elif not work_path.is_dir():
     print('{}: "{}" is not a directory'.format(sys.argv[0], work_path))
 
 
-rl34 = rule34xxx(wait=2, wait_random=0, retries=0, retry_wait=0, logger=sys.stdout)
+rl34 = rule34xxx(
+    wait=2,
+    wait_random=0,
+    retries=0,
+    retry_wait=0,
+    logger=treerequests.simple_logger(sys.stdout),
+)
 
 
 def _nans():
@@ -428,11 +250,11 @@ def post_get(p_id):
 
     try:
         r = rl34.get_post(url="", p_id=p_id)
-    except RequestLError:
+    except treerequests.RedirectionError:
         with open(nonexisiting_path, "w") as f:
             f.write("\n")
         return
-    except (RequestError, RequestCError, RequestBadError):
+    except requests.RequestsException:
         print("{} failed".format(p_id))
         return
 
