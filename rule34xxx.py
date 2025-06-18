@@ -312,4 +312,5 @@ def cli(argv: list[str]):
         )
 
 
-cli(sys.argv[1:] if sys.argv[1:] else ["-h"])
+if __name__ == "__main__":
+    cli(sys.argv[1:] if sys.argv[1:] else ["-h"])

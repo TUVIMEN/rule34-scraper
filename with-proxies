@@ -30,4 +30,4 @@ do
     ((last+=step))
     [ -z "$i" ] && break
 done | parallel -j "$jobs" -C ' ' \
-    ./rule34xxx.py -w 0.4 -W 200 --first {2} --last {3} -d "$dir" --proxies "'{\"https\": \"{1}\"}'"
+    ./rule34xxx.py -w 0.8 -W 1200 --first {2} --last {3} -d "$dir" --proxies "'{\"https\": \"{1}\"}'"
