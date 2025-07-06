@@ -10,11 +10,12 @@ IFS=$'\n'
 dir="$1"
 proxies="$(< "$2")"
 lastid="$(./rule34xxx.py --last-id)"
+hadid='0'
 
 jobs="$(wc -l <<< "$proxies")"
 ((jobs++))
 
-step=$((lastid/jobs))
+step=$(((lastid-hadid)/jobs))
 first=1
 last=$step
 
@@ -22,9 +23,9 @@ echo "$lastid/$jobs"
 
 for i in $proxies ""
 do
-    [ -z "$i" ] && last="$lastid"
+    [ -z "$i" ] && last="$(($first+$step))"
 
-    echo "$i $first $last"
+    echo "$i $((first+hadid)) $((last+hadid))"
 
     ((first+=step))
     ((last+=step))
