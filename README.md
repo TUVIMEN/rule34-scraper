@@ -565,3 +565,7 @@ Request settings:
 # with-proxies
 
 Is a [script](/with-proxies) that takes the working directory and a file with proxy links. It splits the task for the proxies and downloads them independently in parallel.
+
+# Results
+
+You can see scraped results [here](https://huggingface.co/datasets/hexderm/rule34xxx).
