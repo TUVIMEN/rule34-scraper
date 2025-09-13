@@ -39,9 +39,9 @@ def post_verify(data):
         ("copyright", list, (str, 6, 22), 0, 4),
         ("character", list, (str, 6, 19), 1, 4),
         ("artist", list, (str, 7, 12), 0, 1),
-        ("general", list, (str, 2, 29), 25, 274),
-        ("metadata", list, (str, 2, 22), 0, 22),
-        ("comments_count", uint, 0, 2015),
+        ("general", list, (str, 2, 29), 25, 320),
+        ("metadata", list, (str, 2, 22), 0, 30),
+        ("comments_count", uint, 0, 3000),
         ("url", Https),
         (
             "comments",
@@ -63,7 +63,7 @@ def post_verify(data):
 
 def item_test(p_id):
     def t():
-        rl34 = rule34xxx.rule34xxx(wait=1)
+        rl34 = rule34xxx.rule34xxx(wait=1.2, wait_random=0.4)
 
         rl34.save_post(".", "", p_id=p_id)
 
