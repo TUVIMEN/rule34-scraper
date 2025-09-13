@@ -80,6 +80,15 @@ def test_posts_1():
     item_test(949847)
 
 
+def test_posts_deleted():
+    def t():
+        rl34 = rule34xxx.rule34xxx()
+        rl34.save_post(".", "", p_id=2)
+        assert Path("2_e").read_text() == "\n"
+
+    intemp(t)
+
+
 def test_posts_2():
     item_test(7131283)
 
