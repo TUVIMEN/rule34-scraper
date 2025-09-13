@@ -104,7 +104,7 @@ class rule34xxx:
         if p_id != 0:
             url = self.post_url(p_id)
 
-        rq = self.ses.get_html(url)
+        rq, resp = self.ses.get_html(url, response=True)
 
         r = rq.json(
             r"""
@@ -140,7 +140,7 @@ class rule34xxx:
 
         r["date"] = self.conv_date(r["date"])
 
-        return r
+        return r, resp.status_code
 
     def save_post(self, workdir, url, p_id=0, comments=True):
         if p_id == 0:
@@ -156,13 +156,14 @@ class rule34xxx:
             return
 
         try:
-            r = self.get_post(url=url, p_id=p_id, comments=comments)
-        except treerequests.RedirectionError:
-            with open(nonexisiting_path, "w") as f:
-                f.write("\n")
-            return
+            r, code = self.get_post(url=url, p_id=p_id, comments=comments)
         except requests.RequestException:
             print("{} failed".format(p_id))
+            return
+
+        if code >= 300 and code < 400:
+            with open(nonexisiting_path, "w") as f:
+                f.write("\n")
             return
 
         with open(fname, "w") as f:
